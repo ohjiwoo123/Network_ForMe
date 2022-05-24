@@ -33,6 +33,7 @@ void Add_socket_List(struct socket_List_NODE *target,int value)
 	new_node->next = target->next;
 	new_node->sock_Num = value;
 	target->next = new_node;
+	client_index++;
 };
 
 typedef struct connect_List_NODE
@@ -52,8 +53,6 @@ typedef struct disconnect_List_NODE
 	struct disconnect_List_NODE *pNext;
 	char disconnect_List[50];
 }disconnect_List_NODE;
-
-//struct socket_List_NODE *pHead = malloc(sizeof(struct socket_List_NODE));
 
 int main(int argc, char **argv)
 {
@@ -105,7 +104,7 @@ int main(int argc, char **argv)
 
         while(1)
         {
-		if(pthread_create(&thread_PrintUI,NULL,t_PrintUI,(void*)&client_index) !=0 )
+		if(pthread_create(&thread_PrintUI,NULL,t_PrintUI,(void*)&pHead) !=0 )
 		{
 			printf("PrintUI_Thread create error\n");
 			continue;
@@ -201,14 +200,14 @@ void *t_function(void *arg)
 void *t_PrintUI(void *arg)
 {
 	int nMenu = 0;
-
+	socket_List_NODE* pHead = ((socket_List_NODE *)arg);
 	pthread_mutex_lock(&mutex);
 	while((nMenu = PrintUI()) !=0)
 	{
 		switch(nMenu)
 		{
 			case 1:
-				getList();
+				getList(pHead);
 				break;
 			case 2:
 				disConnect();
@@ -241,7 +240,7 @@ int PrintUI()
 	return nInput;
 }
 
-void getList()
+void getList(struct socket_List_NODE* pHead)
 {
 	socket_List_NODE* curr = pHead->next;
 	if (curr == NULL)

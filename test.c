@@ -22,28 +22,18 @@ pthread_mutex_t mutex;
 typedef struct socket_List_NODE
 {
 	int sock_Num;
-	struct socket_List_NODE *p;
+	struct socket_List_NODE *next;
 }socket_List_NODE;
 
 socket_List_NODE* socket_List_Start;
 
-void Add_socket_List(int value)
+void Add_socket_List(struct socket_List_NODE *target,int value)
 {
-	socket_List_NODE *pHead = socket_List_Start;
-	socket_List_NODE *cur = NULL;	// 현재 노드를 가르키는 포인터
-	socket_List_NODE *new_node = NULL; // 새로 생성된 노드를 가르키는 포인터
-	new_node = (socket_List_NODE*)malloc(sizeof(socket_List_NODE));
-
-	if (new_node != NULL)
-	{
-		cur = pHead;
-		pHead =  new_node;
-		pHead->sock_Num = value;
-
-		pHead->p = cur;
-		socket_List_Start = pHead;
-		client_index++;
-	}
+	struct socket_List_NODE *new_node = malloc(sizeof(struct socket_List_NODE));
+	new_node->next = target->next;
+	new_node->sock_Num = value;
+	target->next = new_node;
+	client_index++;
 };
 
 typedef struct connect_List_NODE
@@ -64,9 +54,14 @@ typedef struct disconnect_List_NODE
 	char disconnect_List[50];
 }disconnect_List_NODE;
 
-
 int main(int argc, char **argv)
 {
+	struct socket_List_NODE *pHead;
+	pHead = (socket_List_NODE *)malloc(sizeof(socket_List_NODE));
+	//struct socket_List_NODE *pHead = malloc(sizeof(struct socket_List_NODE));
+	pHead->sock_Num = NULL;
+	pHead->next = NULL;
+
 	printf("Server Start\n");
 	pthread_mutex_init(&mutex,NULL);
 
@@ -112,7 +107,7 @@ int main(int argc, char **argv)
 
         while(1)
         {
-		if(pthread_create(&thread_PrintUI,NULL,t_PrintUI,(void*)&client_index) !=0 )
+		if(pthread_create(&thread_PrintUI,NULL,t_PrintUI,(void*)pHead) !=0 )
 		{
 			printf("PrintUI_Thread create error\n");
 			continue;
@@ -133,7 +128,7 @@ int main(int argc, char **argv)
                 }
 
 		// 링크드 리스트 위한 소켓리스트 목록에 추가 
-		Add_socket_List(client_sock);
+		Add_socket_List(pHead,client_sock);
 		//g_sockList[client_index] = client_sock;
 
                 if(pthread_create(&thread_client[client_index], NULL, t_function, (void *)&client_sock) != 0 )
@@ -161,7 +156,7 @@ void *t_function(void *arg)
         pid_t pid = getpid();      // process id
         pthread_t tid = pthread_self();  // thread id
 
-        //printf("pid:%u, tid:%x\n", (unsigned int)pid, (unsigned int)tid);
+        printf("pid:%u, tid:%x\n", (unsigned int)pid, (unsigned int)tid);
 
         char buf[BUF_SIZE];
 
@@ -205,9 +200,11 @@ void *t_function(void *arg)
 
 }
 
-void *t_PrintUI(void *arg)
+void *t_PrintUI(void *pHead)
 {
+	//printf("arg = %d\n",arg);
 	int nMenu = 0;
+	socket_List_NODE* phead = (socket_List_NODE *)pHead;
 
 	pthread_mutex_lock(&mutex);
 	while((nMenu = PrintUI()) !=0)
@@ -215,7 +212,7 @@ void *t_PrintUI(void *arg)
 		switch(nMenu)
 		{
 			case 1:
-				getList();
+				getList(pHead);
 				break;
 			case 2:
 				disConnect();
@@ -248,19 +245,19 @@ int PrintUI()
 	return nInput;
 }
 
-void getList()
+void getList(struct socket_List_NODE* pHead)
 {
-	socket_List_NODE* pHead = socket_List_Start;
-	if (pHead == NULL)
+	socket_List_NODE* curr = pHead->next;
+	if (curr == NULL)
 	{
 		printf("연결 된 소켓이 없습니다.\n");
 	}
 	else
 	{
-		while(pHead != NULL)
+		while(curr != NULL)
 		{
-			printf("연결된 소켓 번호 : %d\n", pHead->sock_Num);
-			pHead = pHead->p;
+			printf("연결된 소켓 번호 : %d\n", curr->sock_Num);
+			curr = curr->next;
 		}
 	}
 }
