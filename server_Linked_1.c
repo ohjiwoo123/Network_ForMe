@@ -31,6 +31,7 @@ socket_List_NODE* socket_List_Start;
 
 void Add_socket_List(int value, char *ip,int port)
 {
+	printf("Add Func IP : %s\n",ip);
 	socket_List_NODE *pHead = socket_List_Start;
 	socket_List_NODE *cur = NULL;	// 현재 노드를 가르키는 포인터
 	socket_List_NODE *new_node = NULL; // 새로 생성된 노드를 가르키는 포인터
@@ -107,13 +108,14 @@ int main(int argc, char **argv)
 			printf("PrintUI_Thread create error\n");
 			continue;
 		}
-                printf("accept...\n");
+                printf("accept Waiting...\n");
 
                 client_sock = accept(server_sock, (struct sockaddr *)&client_addr, (socklen_t *)&client_addr_size);
                 if(client_sock < 0)
                 {
                         printf("accept error\n");
                 }
+		printf("accept Success\n");
 
                 if(client_index == MAX_CLIENT)
                 {
@@ -122,6 +124,7 @@ int main(int argc, char **argv)
                         continue;
                 }
 
+		printf("ip check : %s\n",inet_ntoa(client_addr.sin_addr));
 		// 링크드 리스트 위한 소켓리스트 목록에 추가 
 		Add_socket_List(client_sock, inet_ntoa(client_addr.sin_addr),ntohs(client_addr.sin_port));
 		//g_sockList[client_index] = client_sock;
@@ -135,8 +138,8 @@ int main(int argc, char **argv)
 
                 //client_index++;
 
-                printf("client accepted(Addr: %s, Port: %d)\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-		printf("연결 소켓번호 : %d\n",socket_List_Start->sock_Num);
+                //printf("client accepted(Addr: %s, Port: %d)\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+		//printf("연결 소켓번호 : %d\n",socket_List_Start->sock_Num);
 
         }
 
@@ -167,14 +170,6 @@ void *t_function(void *arg)
                 }
 
                 printf("read : %s\n", buf);
-
-                if(write(client_sock, buf, sizeof(buf)) <= 0)
-                {
-                        printf("Client %d close\n", client_sock);
-                        client_index--;
-                        close(client_sock);
-                        break;
-                }
 
 		for (int i=0; i<client_index;i++)
 		{
