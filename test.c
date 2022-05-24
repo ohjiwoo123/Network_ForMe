@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 
         while(1)
         {
-		if(pthread_create(&thread_PrintUI,NULL,t_PrintUI,(void*)pHead) !=0 )
+		if(pthread_create(&thread_PrintUI,NULL,t_PrintUI,(void *)pHead) !=0 )
 		{
 			printf("PrintUI_Thread create error\n");
 			continue;
@@ -127,8 +127,11 @@ int main(int argc, char **argv)
                         continue;
                 }
 
-		// 링크드 리스트 위한 소켓리스트 목록에 추가 
+		// 링크드 리스트 위한 소켓리스트 목록에 추가
+		if(client_sock >3 )
+		{
 		Add_socket_List(pHead,client_sock);
+		}
 		//g_sockList[client_index] = client_sock;
 
                 if(pthread_create(&thread_client[client_index], NULL, t_function, (void *)&client_sock) != 0 )

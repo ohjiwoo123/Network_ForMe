@@ -21,13 +21,15 @@ pthread_mutex_t mutex;
 
 typedef struct socket_List_NODE
 {
+	char *IP_Address;
+	int Port;
 	int sock_Num;
 	struct socket_List_NODE *p;
 }socket_List_NODE;
 
 socket_List_NODE* socket_List_Start;
 
-void Add_socket_List(int value)
+void Add_socket_List(int value, char *ip,int port)
 {
 	socket_List_NODE *pHead = socket_List_Start;
 	socket_List_NODE *cur = NULL;	// 현재 노드를 가르키는 포인터
@@ -39,31 +41,19 @@ void Add_socket_List(int value)
 		cur = pHead;
 		pHead =  new_node;
 		pHead->sock_Num = value;
-
+		pHead->IP_Address = ip;
+		pHead->Port = port;
 		pHead->p = cur;
 		socket_List_Start = pHead;
 		client_index++;
 	}
 };
 
-typedef struct connect_List_NODE
-{
-	struct connect_List_NODE *pNext;
-	char connect_List[50];
-}connect_List_NODE;
-
 typedef struct getHistory_List_NODE
 {
 	struct getHistory_List_NODE *pNext;
 	char command_List[30];
 }getHistory_List_NODE;
-
-typedef struct disconnect_List_NODE
-{
-	struct disconnect_List_NODE *pNext;
-	char disconnect_List[50];
-}disconnect_List_NODE;
-
 
 int main(int argc, char **argv)
 {
@@ -133,7 +123,7 @@ int main(int argc, char **argv)
                 }
 
 		// 링크드 리스트 위한 소켓리스트 목록에 추가 
-		Add_socket_List(client_sock);
+		Add_socket_List(client_sock, inet_ntoa(client_addr.sin_addr),ntohs(client_addr.sin_port));
 		//g_sockList[client_index] = client_sock;
 
                 if(pthread_create(&thread_client[client_index], NULL, t_function, (void *)&client_sock) != 0 )
@@ -259,7 +249,7 @@ void getList()
 	{
 		while(pHead != NULL)
 		{
-			printf("연결된 소켓 번호 : %d\n", pHead->sock_Num);
+			printf("연결된 소켓 번호 : %d, IP : %s, Port : %d\n", pHead->sock_Num, pHead->IP_Address, pHead->Port);
 			pHead = pHead->p;
 		}
 	}
