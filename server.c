@@ -19,30 +19,19 @@ pthread_t thread_client[MAX_CLIENT];
 pthread_t thread_PrintUI;
 pthread_mutex_t mutex;
 
-struct socket_List_NODE
+typedef struct socket_info
 {
-	struct socket_List_NODE *pNext;
-	int g_sockList_Count;
-};
+	char IP_Address[14];
+	int Port;
+	int sock_Num;
+}socket_info;
 
-struct connect_List_NODE
+socket_info socket_info_array[5];
+
+typedef struct history_info
 {
-	struct connect_List_NODE *pNext;
-	char connect_List[50];
-};
-
-struct getHistory_List_NODE
-{
-	struct getHistory_List_NODE *pNext;
-	char command_List[30];
-};
-
-struct disconnect_List_NODE
-{
-	struct disconnect_List_NODE *pNext;
-	char disconnect_List[50];
-};
-
+	char *command_info;
+}history_info;
 
 int main(int argc, char **argv)
 {
@@ -113,6 +102,11 @@ int main(int argc, char **argv)
 
 		g_sockList[client_index] = client_sock;
 
+		strcpy(socket_info_array[client_index].IP_Address,inet_ntoa(client_addr.sin_addr));
+		socket_info_array[client_index].Port = (int)ntohs(client_addr.sin_port);
+		socket_info_array[client_index].sock_Num = client_sock;
+		printf("noths크기 : %d\n",sizeof((int)ntohs(client_addr.sin_port)));
+
                 if(pthread_create(&thread_client[client_index], NULL, t_function, (void *)&client_sock) != 0 )
                 {
                         printf("Client_Thread create error\n");
@@ -147,20 +141,12 @@ void *t_function(void *arg)
                 if (read(client_sock, buf, sizeof(buf)) <= 0)
                 {
                         printf("Client %d close\n", client_sock);
-                        client_index--;
-                        close(client_sock);
+                        //client_index--;
+                        //close(client_sock);
                         break;
                 }
 
                 printf("read : %s\n", buf);
-
-                //if(write(client_sock, buf, sizeof(buf)) <= 0)
-                //{
-                //        printf("Client %d close\n", client_sock);
-                //        client_index--;
-                //        close(client_sock);
-                //        break;
-                //}
 
 		for (int i=0; i<client_index;i++)
 		{
@@ -171,8 +157,8 @@ void *t_function(void *arg)
 			if(write(g_sockList[i], buf, sizeof(buf)) <=0)
 			{
 				printf("Client %d close\n", g_sockList[i]);
-				client_index--;
-				close(g_sockList[i]);
+				//client_index--;
+				//close(g_sockList[i]);
 				break;
 			}
 			printf("write : %s\n",buf);
@@ -220,14 +206,16 @@ int PrintUI()
 	// 사용자가 선택한 메뉴의 값을 반환한다.
 	scanf("%d", &nInput);
 	//getchar();
-	// getchar();//버퍼에 남은 엔터 제거용
+	//버퍼에 남은 엔터 제거용
 	return nInput;
 }
 
 void getList()
 {
-	printf("IP, Port\n");
-	//printf("IP: %s, Port: %d\n",inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+	for(int i=0; i<client_index; i++)
+	{
+		printf("소켓번호 : %d, IP : %s, Port : %d\n",socket_info_array[i].sock_Num, socket_info_array[i].IP_Address,socket_info_array[i].Port);
+	}
 }
 
 void disConnect()
@@ -235,8 +223,28 @@ void disConnect()
 	int index;
 	printf("삭제할 소켓 번호를 입력하세요 :\n");
 	scanf("%d",&index);
-	close(index);
-	printf("%d 번 소켓 연결이 종료되었습니다.\n",index);
+	for(int i=client_index-1; i>=0; i--)
+	{
+		if(socket_info_array[i].sock_Num == index)
+		{
+			close(index);
+			printf("%d 번 소켓 연결이 종료되었습니다.\n",index);
+			if(i==client_index-1)
+			{
+				client_index--;
+				break;
+			}
+			else
+			{
+				strcpy(socket_info_array[i].IP_Address,socket_info_array[i+1].IP_Address);
+				socket_info_array[i].Port = socket_info_array[i+1].Port;
+				socket_info_array[i].sock_Num = socket_info_array[i+1].sock_Num;
+				client_index--;
+				break;
+			}
+		}
+		printf("찾는 소켓 번호가 존재 하지 않습니다.\n");
+	}
 }
 
 void getHistory()
@@ -247,7 +255,7 @@ void getHistory()
 void getMenu()
 {
 	printf("위의 메뉴가 다 보이게 하자 \n");
-	getList();
-	disConnect();
-	getHistory();
+	//getList();
+	//disConnect();
+	//getHistory();
 }

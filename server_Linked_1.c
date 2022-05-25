@@ -43,6 +43,7 @@ void Add_socket_List(int value, char *ip,int port)
 		pHead =  new_node;
 		pHead->sock_Num = value;
 		pHead->IP_Address = ip;
+		printf("Add Func2 : %s\n",pHead->IP_Address);
 		pHead->Port = port;
 		pHead->p = cur;
 		socket_List_Start = pHead;
@@ -125,6 +126,7 @@ int main(int argc, char **argv)
                 }
 
 		printf("ip check : %s\n",inet_ntoa(client_addr.sin_addr));
+		//char * test = inet_ntoa(client_addr.sin_addr);
 		// 링크드 리스트 위한 소켓리스트 목록에 추가 
 		Add_socket_List(client_sock, inet_ntoa(client_addr.sin_addr),ntohs(client_addr.sin_port));
 		//g_sockList[client_index] = client_sock;
