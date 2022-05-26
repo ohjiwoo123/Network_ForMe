@@ -33,8 +33,17 @@ typedef struct history_info
 	char *command_info;
 }history_info;
 
+int history_arr_size = 50;
+int history_count_C1 = 0;
+int history_count_C2 = 0;
+
+char *history_arr_C1[50];
+char *history_arr_C2[50];
+
 int main(int argc, char **argv)
 {
+	//char *history_arr_C1[history_arr_size];
+	//char *history_arr_C2[history_arr_size];
 	printf("Server Start\n");
 	pthread_mutex_init(&mutex,NULL);
 
@@ -105,7 +114,6 @@ int main(int argc, char **argv)
 		strcpy(socket_info_array[client_index].IP_Address,inet_ntoa(client_addr.sin_addr));
 		socket_info_array[client_index].Port = (int)ntohs(client_addr.sin_port);
 		socket_info_array[client_index].sock_Num = client_sock;
-		printf("noths크기 : %d\n",sizeof((int)ntohs(client_addr.sin_port)));
 
                 if(pthread_create(&thread_client[client_index], NULL, t_function, (void *)&client_sock) != 0 )
                 {
@@ -134,34 +142,114 @@ void *t_function(void *arg)
         //printf("pid:%u, tid:%x\n", (unsigned int)pid, (unsigned int)tid);
 
         char buf[BUF_SIZE];
-
+	char buf2[BUF_SIZE];
         while(1)
         {
                 memset(buf, 0x00, sizeof(buf));
                 if (read(client_sock, buf, sizeof(buf)) <= 0)
                 {
                         printf("Client %d close\n", client_sock);
-                        //client_index--;
-                        //close(client_sock);
+                        client_index--;
+                        close(client_sock);
                         break;
                 }
 
                 printf("read : %s\n", buf);
 
-		for (int i=0; i<client_index;i++)
+		// 클라이언트가 명령어 보낼 때
+		if (strcmp(buf,"Command")==0)
 		{
-			if (g_sockList[i] == client_sock)
+			memset(buf, 0x00, sizeof(buf));
+			strcpy(buf,"Command_Enter");
+			if (write(client_sock,buf,sizeof(buf)) <= 0)
 			{
-				continue;
+				printf("Client %d close\n",client_sock);
+				client_index--;
+				close(client_sock);
 			}
-			if(write(g_sockList[i], buf, sizeof(buf)) <=0)
+
+			memset(buf,0x00,sizeof(buf));
+			if (read(client_sock, buf, sizeof(buf)) <= 0)
 			{
-				printf("Client %d close\n", g_sockList[i]);
-				//client_index--;
-				//close(g_sockList[i]);
+				printf("Client %d close\n", client_sock);
+				client_index--;
+				close(client_sock);
 				break;
 			}
-			printf("write : %s\n",buf);
+			printf("Command read : %s (from socket : %d)\n", buf,client_sock);
+			// 명령어 문자열 배열 소켓 번호마다 추가 
+			int str_Length = strlen(buf);
+			if (str_Length > 0)
+			{
+				char* newStrPtr = (char*)malloc(sizeof(char)*(str_Length+1));
+				strcpy(newStrPtr,buf);
+
+				if(client_sock == 4)	// 1번 클라이언트 시 
+				{
+					history_arr_C1[history_count_C1] = newStrPtr;
+					history_count_C1++;
+				}
+				else if (client_sock == 5)	// 2번 클라이언트 시 
+				{
+					history_arr_C2[history_count_C2] = newStrPtr;
+					history_count_C2++;
+				}
+				for (int i=0; i<client_index;i++)
+				{
+					if (g_sockList[i] == client_sock)
+					{
+						continue;
+					}
+					if(write(g_sockList[i], buf, sizeof(buf)) <=0)
+					{
+						printf("Client %d close\n", g_sockList[i]);
+						client_index--;
+						close(g_sockList[i]);
+						break;
+					}
+				}
+			}
+		}
+
+		// 보통 (Print_Result 포함)
+		if (strcmp(buf,"Print_Result")==0)
+		{
+			memset(buf,0x00,sizeof(buf));
+			if(read(client_sock, buf, sizeof(buf)) <= 0)
+			{
+				printf("Client %d close\n", client_sock);
+				client_index--;
+				close(client_sock);
+				break;
+			}
+			printf("Print_Result read : %s (from socket : %d)\n", buf, client_sock);
+
+			memset(buf2, 0x00, sizeof(buf2));
+			strcpy(buf2, "Print_Result_Enter");
+
+			for (int i=0; i<client_index;i++)
+			{
+				if (g_sockList[i] == client_sock)
+				{
+					continue;
+				}
+				if(write(g_sockList[i], buf2, sizeof(buf2)) <=0)
+				{
+					printf("Client %d close\n", g_sockList[i]);
+					client_index--;
+					close(g_sockList[i]);
+					break;
+				}
+
+				if(write(g_sockList[i], buf, sizeof(buf)) <= 0)
+				{
+					printf("Client %d close\n", g_sockList[i]);
+					client_index--;
+					close(g_sockList[i]);
+					break;
+				}
+				printf("write (from sock_num = :%d) : %s\n",g_sockList[i],buf);
+			}
 		}
         }
 
@@ -249,7 +337,27 @@ void disConnect()
 
 void getHistory()
 {
-	printf("명령어보낸 모음 ex)ls -al pwd cp A B 등 \n");
+	int index;
+	printf("명령어 기록을 확인하고 싶은 소켓 번호를 입력하세요\n");
+	scanf("%d",&index);
+	if(index == 4)
+	{
+		for (int i=0; i<history_count_C1; i++)
+		{
+			printf("%d번 소켓의 명령어 기록 %d : %s\n",index,i+1,history_arr_C1[i]);
+		}
+	}
+	else if (index == 5)
+	{
+		for (int i=0; i<history_count_C2; i++)
+		{
+			printf("%d번 소켓의 명령어 기록 %d : %s\n",index, i+1, history_arr_C2[i]);
+		}
+	}
+	else
+	{
+		printf("해당번호에 관한 기록이 없습니다.\n");
+	}
 }
 
 void getMenu()

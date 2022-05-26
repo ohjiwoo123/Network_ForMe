@@ -19,44 +19,19 @@ pthread_t thread_client[MAX_CLIENT];
 pthread_t thread_PrintUI;
 pthread_mutex_t mutex;
 
-typedef struct socket_List_NODE
+typedef struct socket_info
 {
-	char IP_Address[20];
+	char IP_Address[14];
 	int Port;
 	int sock_Num;
-	struct socket_List_NODE *p;
-}socket_List_NODE;
+}socket_info;
 
-socket_List_NODE* socket_List_Start;
+socket_info socket_info_array[5];
 
-void Add_socket_List(int value, char *ip,int port)
+typedef struct history_info
 {
-	printf("Add Func IP : %s\n",ip);
-	socket_List_NODE *pHead = socket_List_Start;
-	socket_List_NODE *cur = NULL;	// 현재 노드를 가르키는 포인터
-	socket_List_NODE *new_node = NULL; // 새로 생성된 노드를 가르키는 포인터
-	new_node = (socket_List_NODE*)malloc(sizeof(socket_List_NODE));
-
-	if (new_node != NULL)
-	{
-		cur = pHead;
-		pHead =  new_node;
-		pHead->sock_Num = value;
-		//pHead->IP_Address = ip;
-		strcpy(pHead->IP_Address,ip);
-		printf("Add Func2 : %s\n",pHead->IP_Address);
-		pHead->Port = port;
-		pHead->p = cur;
-		socket_List_Start = pHead;
-		client_index++;
-	}
-};
-
-typedef struct getHistory_List_NODE
-{
-	struct getHistory_List_NODE *pNext;
-	char command_List[30];
-}getHistory_List_NODE;
+	char *command_info;
+}history_info;
 
 int main(int argc, char **argv)
 {
@@ -110,14 +85,13 @@ int main(int argc, char **argv)
 			printf("PrintUI_Thread create error\n");
 			continue;
 		}
-                printf("accept Waiting...\n");
+                printf("accept...\n");
 
                 client_sock = accept(server_sock, (struct sockaddr *)&client_addr, (socklen_t *)&client_addr_size);
                 if(client_sock < 0)
                 {
                         printf("accept error\n");
                 }
-		printf("accept Success\n");
 
                 if(client_index == MAX_CLIENT)
                 {
@@ -126,12 +100,12 @@ int main(int argc, char **argv)
                         continue;
                 }
 
-		printf("ip check : %s\n",inet_ntoa(client_addr.sin_addr));
+		g_sockList[client_index] = client_sock;
 
-		//char * test = inet_ntoa(client_addr.sin_addr);
-		// 링크드 리스트 위한 소켓리스트 목록에 추가
-		Add_socket_List(client_sock, inet_ntoa(client_addr.sin_addr),ntohs(client_addr.sin_port));
-		//g_sockList[client_index] = client_sock;
+		strcpy(socket_info_array[client_index].IP_Address,inet_ntoa(client_addr.sin_addr));
+		socket_info_array[client_index].Port = (int)ntohs(client_addr.sin_port);
+		socket_info_array[client_index].sock_Num = client_sock;
+		printf("noths크기 : %d\n",sizeof((int)ntohs(client_addr.sin_port)));
 
                 if(pthread_create(&thread_client[client_index], NULL, t_function, (void *)&client_sock) != 0 )
                 {
@@ -139,11 +113,10 @@ int main(int argc, char **argv)
                         close(client_sock);
                         continue;
                 }
-		//free(s1);
-                //client_index++;
 
-                //printf("client accepted(Addr: %s, Port: %d)\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-		//printf("연결 소켓번호 : %d\n",socket_List_Start->sock_Num);
+                client_index++;
+
+                printf("client accepted(Addr: %s, Port: %d)\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
         }
 
@@ -168,8 +141,8 @@ void *t_function(void *arg)
                 if (read(client_sock, buf, sizeof(buf)) <= 0)
                 {
                         printf("Client %d close\n", client_sock);
-                        client_index--;
-                        close(client_sock);
+                        //client_index--;
+                        //close(client_sock);
                         break;
                 }
 
@@ -184,8 +157,8 @@ void *t_function(void *arg)
 			if(write(g_sockList[i], buf, sizeof(buf)) <=0)
 			{
 				printf("Client %d close\n", g_sockList[i]);
-				client_index--;
-				close(g_sockList[i]);
+				//client_index--;
+				//close(g_sockList[i]);
 				break;
 			}
 			printf("write : %s\n",buf);
@@ -233,45 +206,45 @@ int PrintUI()
 	// 사용자가 선택한 메뉴의 값을 반환한다.
 	scanf("%d", &nInput);
 	//getchar();
-	// getchar();//버퍼에 남은 엔터 제거용
+	//버퍼에 남은 엔터 제거용
 	return nInput;
 }
 
 void getList()
 {
-	socket_List_NODE* pHead = socket_List_Start;
-	if (pHead == NULL)
+	for(int i=0; i<client_index; i++)
 	{
-		printf("연결 된 소켓이 없습니다.\n");
-	}
-	else
-	{
-		while(pHead != NULL)
-		{
-			printf("연결된 소켓 번호 : %d, IP : %s, Port : %d\n", pHead->sock_Num, pHead->IP_Address, pHead->Port);
-			printf("IP_addr의 메모리 주소 : %x\n", pHead->IP_Address);
-			pHead = pHead->p;
-		}
+		printf("소켓번호 : %d, IP : %s, Port : %d\n",socket_info_array[i].sock_Num, socket_info_array[i].IP_Address,socket_info_array[i].Port);
 	}
 }
 
 void disConnect()
 {
-	socket_List_NODE* pHead = socket_List_Start;
 	int index;
-	printf("삭제할 소켓 번호를 입력하세요 : ");
+	printf("삭제할 소켓 번호를 입력하세요 :\n");
 	scanf("%d",&index);
-	if (pHead == NULL)
+	for(int i=client_index-1; i>=0; i--)
 	{
-		printf("연결 된 소켓이 없습니다.\n");
+		if(socket_info_array[i].sock_Num == index)
+		{
+			close(index);
+			printf("%d 번 소켓 연결이 종료되었습니다.\n",index);
+			if(i==client_index-1)
+			{
+				client_index--;
+				break;
+			}
+			else
+			{
+				strcpy(socket_info_array[i].IP_Address,socket_info_array[i+1].IP_Address);
+				socket_info_array[i].Port = socket_info_array[i+1].Port;
+				socket_info_array[i].sock_Num = socket_info_array[i+1].sock_Num;
+				client_index--;
+				break;
+			}
+		}
+		printf("찾는 소켓 번호가 존재 하지 않습니다.\n");
 	}
-	else
-	{
-		close(index);
-		printf("%d 번 소켓 연결이 종료되었습니다.\n",index);
-		client_index--;
-	}
-
 }
 
 void getHistory()
@@ -286,3 +259,4 @@ void getMenu()
 	//disConnect();
 	//getHistory();
 }
+
