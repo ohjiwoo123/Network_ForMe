@@ -9,7 +9,7 @@
 #define MAX_CLIENT 5
 #define BUF_SIZE 1024
 
-void *t_function(void *data);
+void *t_read_function(void *data);
 void *t_PrintUI(void *data);
 
 int client_index = 0;
@@ -18,7 +18,7 @@ int g_sockList[5];
 pthread_t thread_client[MAX_CLIENT];
 pthread_t thread_PrintUI;
 pthread_mutex_t mutex;
-pthread_mutex_t mutex2;
+
 typedef struct socket_info
 {
 	char IP_Address[14];
@@ -28,12 +28,6 @@ typedef struct socket_info
 
 socket_info socket_info_array[5];
 
-typedef struct history_info
-{
-	char *command_info;
-}history_info;
-
-int history_arr_size = 50;
 int history_count_C1 = 0;
 int history_count_C2 = 0;
 
@@ -44,7 +38,6 @@ int main(int argc, char **argv)
 {
 	printf("Server Start\n");
 	pthread_mutex_init(&mutex,NULL);
-	pthread_mutex_init(&mutex2,NULL);
 
 	int nMenu = 0;
         if (argc != 2)
@@ -114,7 +107,7 @@ int main(int argc, char **argv)
 		socket_info_array[client_index].Port = (int)ntohs(client_addr.sin_port);
 		socket_info_array[client_index].sock_Num = client_sock;
 
-                if(pthread_create(&thread_client[client_index], NULL, t_function, (void *)&client_sock) != 0 )
+                if(pthread_create(&thread_client[client_index], NULL, t_read_function, (void *)&client_sock) != 0 )
                 {
                         printf("Client_Thread create error\n");
                         close(client_sock);
@@ -128,12 +121,11 @@ int main(int argc, char **argv)
         }
 
 	pthread_mutex_destroy(&mutex);
-	pthread_mutex_destroy(&mutex2);
         return 0;
 
 }
 
-void *t_function(void *arg)
+void *t_read_function(void *arg)
 {
         int client_sock = *((int *)arg);
         pid_t pid = getpid();      // process id
@@ -145,11 +137,7 @@ void *t_function(void *arg)
 	char buf2[BUF_SIZE];
         while(1)
         {
-		//pthread_mutex_lock(&mutex2);
                 memset(buf, 0x00, sizeof(buf));
-		memset(buf2, 0x00, sizeof(buf2));
-
-		// 처음에 명령어를 읽고 buf에다가 저장해요. 
                 if (read(client_sock, buf, sizeof(buf)) <= 0)
                 {
                         printf("Client %d close\n", client_sock);
@@ -158,32 +146,31 @@ void *t_function(void *arg)
                         break;
                 }
 
-                printf("Command read (from socket : %d): %s\n", client_sock,buf);
+                printf("read : %s\n", buf);
 
-		// 클라이언트 측으로부터 Command라는 단어를 받아와요. 
-		if(read(client_sock, buf2, sizeof(buf2)) <= 0)
+		//pthread_mutex_lock(&mutex);
+		// 클라이언트가 명령어 보낼 때
+		if (strcmp(buf,"Command")==0)
 		{
-			printf("Client %d close\n",client_sock);
-			client_index--;
-			close(client_sock);
-			break;
-		}
-		printf("buf2 : %s\n",buf2);
-
-		// 만약 클라이언트가 Command라는 단어를 보내면, 
-		if (strcmp(buf2,"Command")==0)
-		{
-			memset(buf2, 0x00, sizeof(buf2));
-			// 클라이언트에게 Command 모드로 진입하라고 알려줘요 
-			strcpy(buf2,"Command_Enter");
-			if (write(client_sock,buf2,sizeof(buf2)) <= 0)
+			memset(buf, 0x00, sizeof(buf));
+			strcpy(buf,"Command_Enter");
+			if (write(client_sock,buf,sizeof(buf)) <= 0)
 			{
 				printf("Client %d close\n",client_sock);
 				client_index--;
 				close(client_sock);
 			}
-
-			// 명령어 문자열 배열 소켓 번호마다 추가해요 
+			// 여기서 명령어를 읽을거임.
+			memset(buf,0x00,sizeof(buf));
+			if (read(client_sock, buf, sizeof(buf)) <= 0)
+			{
+				printf("Client %d close\n", client_sock);
+				client_index--;
+				close(client_sock);
+				break;
+			}
+			//printf("Command read : %s (from socket : %d)\n", buf,client_sock);
+			// 명령어 문자열 배열 소켓 번호마다 추가 
 			int str_Length = strlen(buf);
 			if (str_Length > 0)
 			{
@@ -200,7 +187,6 @@ void *t_function(void *arg)
 					history_arr_C2[history_count_C2] = newStrPtr;
 					history_count_C2++;
 				}
-				// 나 자신을 제외한 다른 클라이언트에게 명령어를 보내요 
 				for (int i=0; i<client_index;i++)
 				{
 					if (g_sockList[i] == client_sock)
@@ -214,64 +200,12 @@ void *t_function(void *arg)
 						close(g_sockList[i]);
 						break;
 					}
-					printf("server write : %s\n",buf);
 				}
-			}
-			
-			memset(buf,0x00,sizeof(buf));
-			// 클라이언트 측으로부터 명령어 결과를 읽어요. 
-			if (read(client_sock, buf, sizeof(buf)) <= 0)
-			{
-				printf("Client %d close\n", client_sock);
-				client_index--;
-				close(client_sock);
-				break;
-			}
-			printf("inside of cmd if) read : %s (from socket : %d)\n", buf,client_sock);
-			
-			if (strcmp(buf,"Print_Result")==0)
-			{
-				memset(buf,0x00,sizeof(buf));
-				if(read(client_sock,buf,sizeof(buf))<=0)
-				{
-					printf("Client %d close\n", client_sock);
-					client_index--;
-					close(client_sock);
-					break;
-				}
-				printf("Print_Result read : %s (from socket : %d)\n", buf, client_sock);
 
-				memset(buf2, 0x00, sizeof(buf2));
-				strcpy(buf2, "Print_Result_Enter");
-
-				for (int i=0; i<client_index;i++)
-				{
-					if(g_sockList[i] == client_sock)
-					{
-						continue;
-					}
-					if(write(g_sockList[i],buf2, sizeof(buf2)) <=0)
-					{
-						printf("Client %d close\n",g_sockList[i]);
-						client_index--;
-						close(g_sockList[i]);
-						break;
-					}
-
-					if(write(g_sockList[i],buf, sizeof(buf)) <=0)
-					{
-						printf("Client %d close\n", g_sockList[i]);
-						client_index--;
-						close(g_sockList[i]);
-						break;
-					}
-					printf("write (from sock_num = %d) : %s\n", g_sockList[i],buf);
-				}
 			}
 		}
-
 		// 보통 (Print_Result 포함)
-		else if (strcmp(buf,"Print_Result")==0)
+		if (strcmp(buf,"Print_Result")==0)
 		{
 			memset(buf,0x00,sizeof(buf));
 			if(read(client_sock, buf, sizeof(buf)) <= 0)
@@ -281,7 +215,7 @@ void *t_function(void *arg)
 				close(client_sock);
 				break;
 			}
-			printf("Print_Result read : %s (from socket : %d)\n", buf, client_sock);
+			//printf("Print_Result read : %s (from socket : %d)\n", buf, client_sock);
 
 			memset(buf2, 0x00, sizeof(buf2));
 			strcpy(buf2, "Print_Result_Enter");
@@ -307,10 +241,9 @@ void *t_function(void *arg)
 					close(g_sockList[i]);
 					break;
 				}
-				printf("write (from sock_num = :%d) : %s\n",g_sockList[i],buf);
+				//printf("write (from sock_num = :%d) : %s\n",g_sockList[i],buf);
 			}
 		}
-		//pthread_mutex_unlock(&mutex2);
         }
 
 }
@@ -333,9 +266,6 @@ void *t_PrintUI(void *arg)
 			case 3:
 				getHistory();
 				break;
-			case 4:
-				getMenu();
-				break;
 		}
 	}
 	pthread_mutex_unlock(&mutex);
@@ -348,7 +278,7 @@ int PrintUI()
 	printf("===================================================\n");
 	printf("서버 Start\n");
 	printf("---------------------------------------------------\n");
-	printf("[1] 연결현황출력\t [2] 연결종료\t [3] 명령어기록보기\t [4] 전체보기\t");
+	printf("[1] 연결현황출력\t [2] 연결종료\t [3] 명령어기록보기\t\n");
 	printf("===================================================\n");
 
 	// 사용자가 선택한 메뉴의 값을 반환한다.
@@ -420,10 +350,9 @@ void getHistory()
 	}
 }
 
-void getMenu()
+void error_handling(char *message)
 {
-	printf("위의 메뉴가 다 보이게 하자 \n");
-	//getList();
-	//disConnect();
-	//getHistory();
+	fputs(message,stderr);
+	fputc('\n',stderr);
+	exit(1);
 }
